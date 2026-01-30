@@ -1468,7 +1468,7 @@
 	logical, parameter :: bn = .false.
 
 	if( .not. allocated(hlvrst) ) then
-	  allocate(hlvrst(nlv_global))
+	  allocate(hlvrst(nlv))
 	  allocate(ilhrst(nel))
 	  allocate(ilhkrst(nkn))
 	  hlvrst = 0.

@@ -77,12 +77,15 @@
 
   subroutine rst_write(rstname,atimea)
 
+  use mod_restart
+  use shympi
   implicit none
 
   character(len=*), intent(in) :: rstname
   double precision, intent(in) :: atimea
   real*4 :: svar
 
+  hlv_global = hlvrst 
   open(34,file=rstname,form='unformatted')
   call rst_write_record(atimea,34)
   close(34)
