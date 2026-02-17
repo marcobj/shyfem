@@ -38,7 +38,7 @@ ENKOBJ = analysis.o m_ensmean.o m_ensvar.o m_mean_preserving_rotation.o \
 	 m_multa.o m_random.o m_randrot.o mod_anafunc.o
 
 SAMPOBJ = m_pseudo2D.o m_fixsample2D.o m_newton2D.o m_newtonfunc2D.o \
-	  m_sample2D.o mod_fftw3.o
+	  m_sample2D.o mod_fftw3.o m_set_random_seed2.o
           
 ENSOBJ = $(ENKOBJ) $(SAMPOBJ) subenkf.o mod_mod_err.o mod_enkf.o \
 	 mod_ens_state.o mod_init_enkf.o mod_manage_obs.o mod_mod_states.o \
@@ -54,7 +54,7 @@ ENSMOD = $(MODDIR)/m_random.mod $(MODDIR)/mod_mod_err.mod $(MODDIR)/mod_enkf.mod
 	 $(MODDIR)/m_mean_preserving_rotation.mod $(MODDIR)/m_multa.mod $(MODDIR)/m_sample2d.mod \
 	 $(MODDIR)/m_randrot.mod $(MODDIR)/m_pseudo2d.mod $(MODDIR)/mod_fftw3.mod \
 	 $(MODDIR)/m_newton2d.mod $(MODDIR)/m_newtonfunc2d.mod $(MODDIR)/m_fixsample2d.mod \
-	 $(MODDIR)/mod_obs_states.mod $(MODDIR)/mod_mod_states.mod
+	 $(MODDIR)/mod_obs_states.mod $(MODDIR)/mod_mod_states.mod $(MODDIR)/m_set_random_seed2.mod
 
 #-------------------- all the exec files
 EXES = main make_eof_ens_meteo enKF2enKS perturbeBC make_antime_list
@@ -106,6 +106,7 @@ depend:
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
+../femlib/mod/m_set_random_seed2.mod: m_set_random_seed2.o
 ../femlib/mod/m_ensmean.mod: m_ensmean.o
 ../femlib/mod/m_ensvar.mod: m_ensvar.o
 ../femlib/mod/m_fixsample1d.mod: m_fixsample1D.o
@@ -123,7 +124,6 @@ depend:
 ../femlib/mod/m_randrot.mod: m_randrot.o
 ../femlib/mod/m_sample1d.mod: m_sample1D.o
 ../femlib/mod/m_sample2d.mod: m_sample2D.o
-../femlib/mod/m_set_random_seed2.mod: m_set_random_seed2.o
 ../femlib/mod/mod_anafunc.mod: mod_anafunc.o
 ../femlib/mod/mod_enkf.mod: mod_enkf.o
 ../femlib/mod/mod_ens_state.mod: mod_ens_state.o
@@ -162,7 +162,8 @@ main.o: ../femlib/mod/mod_enkf.mod ../femlib/mod/mod_ens_state.mod \
 		../femlib/mod/mod_mod_err.mod \
 		../femlib/mod/mod_mod_states.mod \
 		../femlib/mod/mod_para.mod \
-		../femlib/mod/mod_restart.mod 
+		../femlib/mod/mod_restart.mod \
+		../femlib/mod/m_set_random_seed2.mod
 make_antime_list.o: ../femlib/mod/iso8601.mod
 make_eof_ens_meteo.o: ../femlib/mod/m_random.mod
 mod_anafunc.o: ../femlib/mod/m_ensmean.mod \
@@ -208,4 +209,3 @@ sublocan.o: ../femlib/mod/basin.mod ../femlib/mod/mod_enkf.mod \
 		../femlib/mod/mod_manage_obs.mod \
 		../femlib/mod/mod_para.mod \
 		../femlib/mod/mod_restart.mod 
-

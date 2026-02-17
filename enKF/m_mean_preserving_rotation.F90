@@ -11,12 +11,10 @@ module m_mean_preserving_rotation
   !!   - Form Upb = diag(1, U)
   !!   - Set Up = B * Upb * B^T
   !!
-  use iso_fortran_env, only: real64, int32
+  use iso_fortran_env, only : dp => real64
+  use iso_fortran_env, only : ip => int32
   use m_randrot                       ! Assumed to provide: randrot(U, n) in double precision
   implicit none
-
-  integer, parameter :: dp = real64
-  integer, parameter :: ip = int32
 
   ! Provide an explicit interface for BLAS dgemm (double precision).
   ! Adjust name mangling/linking flags as needed when linking BLAS/LAPACK.

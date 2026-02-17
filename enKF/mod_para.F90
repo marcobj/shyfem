@@ -1,90 +1,88 @@
+!======================================================================
+!  Module: mod_para
 !
-! Copyright (C) 2017, Marco Bajo, CNR-ISMAR Venice, All rights reserved.
+!  Purpose:
+!    Central configuration parameters for:
+!      - EnKF analysis modes
+!      - Ensemble inflation
+!      - Localisation
+!      - Initial ensemble generation
+!      - Observation handling
 !
+!  Notes:
+!    * Time-related tolerances and decay scales use DOUBLE PRECISION.
+!    * Observation QC bounds and flags remain REAL to match obs arrays.
+!======================================================================
 module mod_para
+  implicit none
 
-  integer, save :: rmode = 13 ! Ensemble Kalman Filter with SVD pseudo inversion of SS'+ EE'
-  !22 Square root algorithm with SVD pseudo inversion of SS'+(N-1)R
-  !23 Square root algorithm with SVD pseudo inversion of SS'+ EE'
-  !10 exact update scheme for diagonal obs-err-cov-mat
+  !--------------------------------------------------------------------
+  ! Analysis method selector
+  !--------------------------------------------------------------------
+  integer, save :: rmode = 13
+  !   13 : EnKF with SVD pseudo-inversion of SS' + EE'
+  !   22 : Square-root method with SVD pseudo-inversion of SS' + (N-1)R
+  !   23 : Square-root method with SVD pseudo-inversion of SS' + EE'
+  !   10 : Exact update for diagonal observation-error covariance
 
-  logical, parameter :: verbose = .true. ! Prints diagnostic output
+  ! Diagnostics
+  logical, parameter :: verbose = .true.
 
-  integer, parameter :: inflate = 2  ! Inflation
-                                     ! 0 = off
-				     ! 1 = multiplicative
-				     ! 2 = adaptive according to Evensen 2009
-  real, parameter :: infmult = 1.    ! If inflate=1 -> infmult in the range 1.01-1.1 may be reasonable inflation factors 
-		                                       ! dependent on the ensemble size.
-						       ! If inflate=2 -> you can set it to 1.0 since infmult only serves as an adjustment of
-						       ! the adaptive multiplication factor
-                                   
+  !--------------------------------------------------------------------
+  ! Ensemble inflation
+  !--------------------------------------------------------------------
+  integer, parameter :: inflate = 2    ! 0=off, 1=multiplicative, 2=adaptive
+  real,    parameter :: infmult = 1.0  ! Inflation multiplier when inflate=1
 
-  ! Set these parameters for local analysis. Important.				       
-  !
-  integer, save :: is_local = 0 !Local analysis. 0 disable, 1 local analysis. Specify radii in the info files.
+  !--------------------------------------------------------------------
+  ! Local analysis (localisation)
+  !--------------------------------------------------------------------
+  integer, save :: is_local = 0        ! 0=off, 1=enabled
 
-  ! set this to 1 to include the model errors in the analysis (to test) or equal 2 to
-  ! include model parameters (todo)
-  !
-  integer, parameter :: mode_an = 0
+  !--------------------------------------------------------------------
+  ! Innovation limiter
+  !--------------------------------------------------------------------
+  integer, parameter :: mode_an   = 0
+  real,    parameter :: inn_alpha = 5.0
 
-  ! This coefficient limits the maximum for the innovations that are too large
-  real, parameter :: inn_alpha = 5.
+  !--------------------------------------------------------------------
+  ! Initial ensemble generation
+  !--------------------------------------------------------------------
+  integer, parameter :: fmult_init   = 10   ! supersampling factor
+  real,    parameter :: theta_init   = 0.0  ! rotation angle (degrees)
+  real,    parameter :: sigma_init_z = 0.03 ! std of free surface
+  real,    parameter :: sigma_init_t = 1.0  ! std of temperature
+  real,    parameter :: sigma_init_s = 1.0  ! std of salinity
+  logical, parameter :: sample_fix_init = .true.  ! fixed sampling seed
 
-!------------
-! Settings for the creation of the initial ensemble
-  integer,parameter :: fmult_init = 10             !mult factor to determine the supersampling
-  real, parameter :: theta_init = 0.              !rotation of the random fields (0 East, anticlockwise)
-  real, parameter :: sigma_init_z = 0.03               !standard deviation of zeta
-  real, parameter :: sigma_init_t = 1.                 !standard deviation of temperature
-  real, parameter :: sigma_init_s = 1.                 !standard deviation of salinity
-  logical, parameter ::  sample_fix_init = .true.
+  !--------------------------------------------------------------------
+  ! Observation perturbations (temporal correlation)
+  !--------------------------------------------------------------------
+  ! Negative value means white noise (no temporal correlation)
+  double precision, parameter :: TTAU_0D = -1.0d0
+  double precision, parameter :: TTAU_2D = 3.0d0 * 3600.0d0
 
-!
-!------------
-! Settings for the observation perturbations (mod_enkf)
-!
-  ! decay time for the red noise of the observations (sec). 
-  ! Set lower than 0 to disable (white noise)
-  !
-  double precision, parameter :: TTAU_0D = -1
-  double precision, parameter :: TTAU_2D = 3*3600.
+  !--------------------------------------------------------------------
+  ! Observation quality-control and processing
+  !--------------------------------------------------------------------
+  real, parameter :: KSTD = 2.0       ! std limiter factor (<=0 disables)
 
-!------------
-! Settings to manage the observations (mod_manage_obs)
-!
-  ! multiplication factor for the ens std, to resize
-  ! the obs std (default = 2). Set <= 0 to disable it.
-  ! See Sakov et al. 2012.
-  !
-  real, parameter :: KSTD = 2
+  ! SVD truncation and perturbation options
+  real,    parameter :: truncation     = 0.99
+  logical, parameter :: lrandrot       = .false.
+  logical, parameter :: lupdate_randrot = .true.
+  logical, parameter :: lsymsqrt       = .true.
 
-  ! parameters for the analysis
-  real, parameter :: truncation = 0.99 ! truncation of the SVD eigenvalues
-  logical, parameter :: lrandrot = .false. ! True if additional random rotation is used
-  logical, parameter :: lupdate_randrot = .true. 
-  !logical, parameter :: lupdate_randrot = .false. ! False to avoid randomness
-  logical, parameter :: lsymsqrt = .true. ! true if symmetrical square root of Sakov is used (should be used)
+  ! Time window (seconds) to accept obs near analysis time
+  double precision, parameter :: TEPS = 300.0d0
 
-  ! time interval (sec) to select an observation
-  ! with respect to the analysis time
-  !
-  double precision, parameter :: TEPS = 300.
+  ! Missing-observation flag
+  real, parameter :: OFLAG = -999.0
 
-  ! standard flag for a missing observation
-  !
-  real, parameter :: OFLAG = -999.
-
-  ! min-max values for the observation and model check
-  !
-  real, parameter :: TEM_MIN = -20.0d0
-  real, parameter :: TEM_MAX = 60.0d0
-  real, parameter :: SAL_MIN = -0.5d0
-  real, parameter :: SAL_MAX = 60.0d0
-  real, parameter :: SSH_MIN = -8.0d0
-  real, parameter :: SSH_MAX = 8.0d0
-  real, parameter :: VEL_MIN = -90000.0d0
-  real, parameter :: VEL_MAX = 90000.0d0	!used also for u and v, min with -
+  ! Min/max QC bounds for observations
+  real, parameter :: TEM_MIN = -20.0, TEM_MAX = 60.0
+  real, parameter :: SAL_MIN =  -0.5, SAL_MAX = 60.0
+  real, parameter :: SSH_MIN =  -8.0, SSH_MAX =  8.0
+  real, parameter :: VEL_MIN = -90000.0, VEL_MAX = 90000.0
 
 end module mod_para
