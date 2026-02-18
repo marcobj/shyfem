@@ -1,19 +1,23 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# Copyright (C) 2017, Marco Bajo, CNR-ISMAR Venice, All rights reserved.
+# Copyright (C) 2017-2026, Marco Bajo, CNR-ISMAR Venice, All rights reserved.
 #
 # ------------------------------------------------------------------------------
 # Ensemble Kalman Filter (EnKF) for SHYFEM
 # ------------------------------------------------------------------------------
+#
+# See the README file for an help
+#
+#
+
 
 # --- PATH & ENVIRONMENT SETUP ---
-SCRIPT=$(realpath "$0")
-SCRIPTPATH=$(dirname "$SCRIPT")
-FEMDIR="$SCRIPTPATH/.."
-SIMDIR=$(pwd)
+SCRIPT=$(realpath $0)
+SCRIPTPATH=$(dirname $SCRIPT)
+FEMDIR=$SCRIPTPATH/..	# fem directory
+SIMDIR=$(pwd)		# current dir
 
-# --- FUNCTIONS ---
-
+#----------------------------------------------------------
 Usage() {
     echo "Usage: enKF.sh [method] [localisation] [bas-file] [nlv] [n] [out]"
     echo ""
@@ -27,6 +31,7 @@ Usage() {
     exit 1
 }
 
+#----------------------------------------------------------
 Check_file() {
     if [ ! -s "$1" ]; then
         echo "[ERROR] File missing or zero size: $1"
@@ -34,6 +39,7 @@ Check_file() {
     fi
 }
 
+#----------------------------------------------------------
 Check_files() {
     echo "[INFO] Validating executables..."
     command -v parallel > /dev/null 2>&1 || { echo "[ERROR] GNU Parallel not found."; exit 1; }
@@ -44,6 +50,7 @@ Check_files() {
     for f in ens_list.txt obs_list.txt antime_list.txt; do Check_file "$f"; done
 }
 
+#----------------------------------------------------------
 Read_ens_list() {
     echo "[INFO] Initializing ensemble members..."
     rm -f an00001_en*b.rst
@@ -66,7 +73,8 @@ Read_ens_list() {
     nrens=$nrow
 }
 
-Read_an_time_list() {
+#----------------------------------------------------------
+Read_antime_list() {
     nrow=0; nran=0
     while read -r line || [ -n "$line" ]; do
         nrow=$((nrow + 1))
@@ -80,12 +88,14 @@ Read_an_time_list() {
     done < antime_list.txt
 }
 
+#----------------------------------------------------------
 SkelStr() {
     sed -e "s|NAMESIM|$1|g" -e "s|ITANF|$2|g" \
         -e "s|ITEND|$3|g" -e "s|RESTRT|$4|g" \
         -e "s|IDTRST|-1|g" "$5" > "$6"
 }
 
+#----------------------------------------------------------
 Write_obs_file() {
     local na=$1
     IFS=' ' read -r -a nisfile <<< "${isfile[$na]}"
@@ -97,6 +107,7 @@ Write_obs_file() {
     done < obs_list.txt
 }
 
+#----------------------------------------------------------
 Write_info_file() {
     local na=$1
     {
@@ -106,6 +117,7 @@ Write_info_file() {
     } > analysis.info
 }
 
+#----------------------------------------------------------
 Run_ensemble_analysis() {
     local na=$1
     local nanl=$(printf "%05d" "$na")
@@ -120,48 +132,35 @@ Run_ensemble_analysis() {
     done
 }
 
+# -------------------------------------------------------------------
 # ------------------------------ MAIN -------------------------------
+# -------------------------------------------------------------------
 
 [ $# -lt 6 ] && Usage
 rmode=$1; islocal=$2; bas_file=$3; nnlv=$4; nthreads=$5; out_verb=$6
 
 export OMP_NUM_THREADS=$nthreads
 
-#resdir='RESULTS'
-resdir='.'
-
+# Checking the executable programs
 Check_files
 
+# Reading skel file list
 Read_ens_list
 
-Read_an_time_list
+# Reading obs file list
+Read_antime_list
 
-# Setup results directory
-mkdir -p $resdir
-rm -f $resdir/X5*.uf $resdir/backKF_*.rst $resdir/analKF_*.rst
-
+# Assimilation cycle for every analysis time step
+rm -f X5*.uf backKF_*.rst analKF_*.rst
 for (( na = 1; na <= nran; na++ )); do
    echo -e "\n--- STEP $na OF $nran ---"
+
    Write_obs_file "$na"
+
    Write_info_file "$na"
 
    # 1. ANALYSIS
    Run_ensemble_analysis "$na"
-
-   # SAVE RESULTS LOGIC
-   nanl=$(printf "%05d" "$na")
-
-   if [ "$out_verb" -eq 1 ]; then
-       echo "[SAVE] Archiving all ensemble restarts for step $na..."
-       [[ "$na" -gt "1" ]] && cat an${nanl}_en*b.rst >> $resdir/backKF_en$nel.rst
-       an${nanl}_en*a.rst >> $resdir/analKF_en$nel.rst
-   fi
-   # Save the last restarts
-   [[ "$na" -eq "$nran" ]] && mv -f an${nanl}_en${nel}a.rst $resdir/analKF_en$nel.rst
-
-   # Always save the mean/std
-   [ -f an${nanl}_mean_a.rst ] && cat an${nanl}_mean_a.rst >> $resdir/analKF_mean.rst
-   [ -f an${nanl}_std_a.rst ] && cat an${nanl}_std_a.rst >> $resdir/analKF_std.rst
 
    # 2. FORECAST (only if not the last step)
    if [ "$na" -ne "$nran" ]; then
@@ -179,13 +178,33 @@ for (( na = 1; na <= nran; na++ )); do
       export OMP_NUM_THREADS=1
       parallel --jobs "$nthreads" "$FEMDIR/fem3d/shyfem {} > {.}.log 2>&1" ::: $str_list
       export OMP_NUM_THREADS=$nthreads
-
-      for (( ne = 0; ne < nrens; ne++ )); do
-         naal=$(printf "%05d" $((na + 1)))
-         nel=$(printf "%05d" "$ne")
-         Check_file "an${naal}_en${nel}b.rst"
-      done
    fi
-done
 
-echo -e "\n[SUCCESS] All files saved in $resdir/ directory."
+   # merge the rst files
+   nanl=$(printf "%05d" $na)
+   for (( ne = 0; ne < $nrens; ne++ )); do
+        nel=$(printf "%05d" $ne)
+        filename1="an${nanl}_en${nel}b.rst"
+        filename2="an${nanl}_en${nel}a.rst"
+        Check_file $filename1
+        Check_file $filename2
+	# If not verbose, saves only the last rst for each member
+	if [ "$out_verb" -eq "1" ]; then
+		[[ "$na" -gt "1" ]] && cat $filename1 >> backKF_en$nel.rst
+		cat $filename2 >> analKF_en$nel.rst
+	else
+	        [[ "$na" -eq "$nran" ]] && mv -f $filename2 analKF_en$nel.rst
+	fi
+	rm -f $filename1 $filename2
+   done
+   filename1="an${nanl}_mean_a.rst"
+   filename2="an${nanl}_std_a.rst"
+   Check_file $filename1
+   Check_file $filename2
+   cat $filename1 >> analKF_mean.rst
+   cat $filename2 >> analKF_std.rst
+   rm -f $filename1 $filename2
+   rm -f an*_en*b.inf an*_en*.log an*_en*b.str 
+
+done
+echo -e "\n[SUCCESS] All files saved in the current directory."

@@ -20,13 +20,20 @@
 
 program main
    use iso_fortran_env, only : dp => real64
+   use m_set_random_seed2
    use mod_enkf
    use mod_mod_err
    use mod_restart, only : ibarcl_rst
    implicit none
 
-   integer :: ndim, istat
    real(dp), allocatable :: Amat(:,:)
+   integer :: istat, ndim
+
+
+   !--------------------------------------------------------------------------
+   ! Init a random seed and save in random_seed.dat, or read it from this file
+   !--------------------------------------------------------------------------
+   call init_random_seed_persistent('random_seed.dat',.true.)
 
    !--------------------------------------------------------------------------
    ! Read configuration, parameters, runtime flags (sets rmode, mode_an, etc.)
