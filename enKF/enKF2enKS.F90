@@ -29,10 +29,16 @@ program enKF2enKS
   real(dp) :: atime                     ! record time
   integer :: fid                        ! file unit id
 
+  !---------------------------- rst ----------------------------
+  ! Single-precision parameters expected by addpar/daddpar
+  real*4 :: ibarcl4, iconz4, imerc4, iturb4, iwvert4, ieco4, zero4
+
   !---------------------------- Ensemble storage ----------------------------
   real(dp), allocatable :: Astate(:,:), AmeanKF(:), AstdKF(:), AmeanKS(:), AstdKS(:)
   integer :: rrec, sdim                 ! record counter; state vector size
   integer :: nlag                       ! (re)parsed smoother lag
+
+  zero4 = 0.
 
   !---------------------------- Read & check inputs ----------------------------
   call get_command_argument(1, basinf)
@@ -65,7 +71,7 @@ program enKF2enKS
   read(lnlag, *) nlag
   if ((nlag < 2) .and. (nlag /= -1)) error stop 'enKF2enKS: bad nlag'
 
-  write(*,*) 'Limited Kalman smoother. Number of time steps: ', nlag
+  write(*,*) 'Kalman smoother. Number of time steps: ', nlag
 
   call init_shyfem(basinf, nnlv)
 
@@ -94,7 +100,6 @@ program enKF2enKS
   rrec = 0
 89 continue
 
-  nkn_global = nkn; nel_global = nel; nlv_global = nlv
 
   ! Read ensemble record across all members, same time index
   do nre = 1, nrens
@@ -104,26 +109,41 @@ program enKF2enKS
      if (ierr > 0) error stop 'Error in reading the restart files'
 
      if (.not. allocated(Astate)) then
-        sdim = nkn + 2*nlv*nel + 2*nlv*nkn
+        if (ibarcl_rst /= 0) then
+           sdim = nkn + 2*nlv*nel + 2*nlv*nkn
+        else
+           sdim = nkn + 2*nlv*nel
+        end if
         allocate(Astate(sdim, nrens))
         allocate(AmeanKF(sdim), AmeanKS(sdim))
         allocate(AstdKF(sdim),  AstdKS(sdim))
         Astate = 0.0_dp
      end if
 
-     call push_matrix(sdim, nrens, nre, Astate)
+     call push_matrix(sdim, nrens, nre, Astate, ibarcl_rst)
   end do
 
   ! Add RST parameters (first record only)
   if (rrec == 0) then
-     call addpar('ibarcl', ibarcl_rst)
-     call addpar('iconz',  iconz_rst)
-     call addpar('iwvert', iwvert_rst)  ! maybe not
-     call addpar('ieco',   ieco_rst)    ! maybe not
-     call addpar('ibio',   0)
-     call addpar('ibfm',   0)
-     call addpar('imerc',  imerc_rst)
-     call addpar('iturb',  iturb_rst)
+     hlv  = hlvrst
+     ilhv = ilhrst
+     ilhkv = ilhkrst
+
+     ibarcl4     = ibarcl_rst
+     iwvert4     = iwvert_rst
+     ieco4       = ieco_rst
+     iconz4      = iconz_rst
+     imerc4      = imerc_rst
+     iturb4      = iturb_rst
+
+     call addpar('ibarcl', ibarcl4)
+     call addpar('iconz',  iconz4)
+     call addpar('iwvert', iwvert4)
+     call addpar('ieco',   ieco4)
+     call addpar('ibio',   zero4)
+     call addpar('ibfm',   zero4)
+     call addpar('imerc',  imerc4)
+     call addpar('iturb',  iturb4)
      call daddpar('date',  0.0_dp)
      call daddpar('time',  0.0_dp)
   end if
@@ -135,17 +155,17 @@ program enKF2enKS
   ! Compute EnKS mean and std of the ensemble
   call make_mn_std(sdim, nrens, Astate, AmeanKS, AstdKS)
 
-  call pull_state(sdim, AmeanKS)
+  call pull_matrix(sdim, nrens, 1, AmeanKS, ibarcl_rst)
   call rst_write_record(atime, 18)
 
-  call pull_state(sdim, AstdKS)
+  call pull_matrix(sdim, nrens, 1, AstdKS, ibarcl_rst)
   call rst_write_record(atime, 19)
 
   ! Optional: write full smoothed ensemble
   if (lout == 'full') then
      do nre = 1, nrens
         fid = 20 + nrens + nre
-        call pull_matrix(sdim, nrens, nre, Astate)
+        call pull_matrix(sdim, nrens, nre, Astate, ibarcl_rst)
         call rst_write_record(atime, fid)
      end do
   end if
@@ -179,29 +199,17 @@ end program enKF2enKS
 !*******************************************************************************
 subroutine num2str(num, str)
   implicit none
-  integer, intent(in)        :: num
+  integer,          intent(in)  :: num
   character(len=5), intent(out) :: str
-
-  if ((num >= 0).and.(num < 10)) then
-     write(str,'(a4,i1)') '0000', num
-  elseif ((num >= 10).and.(num < 100)) then
-     write(str,'(a3,i2)') '000',  num
-  elseif ((num >= 100).and.(num < 1000)) then
-     write(str,'(a2,i3)') '00',   num
-  elseif ((num >= 1000).and.(num < 10000)) then
-     write(str,'(a1,i4)') '0',    num
-  elseif ((num >= 10000).and.(num < 100000)) then
-     write(str,'(i5)')     num
-  else
-     error stop 'num2str: num out of range'
-  end if
+  if (num < 0 .or. num > 99999) error stop 'num2str: num out of range'
+  write(str, '(I5.5)') num
 end subroutine num2str
 
 !*******************************************************************************
 ! Push model state from SHYFEM fields into the ensemble matrix column nre
 ! Layout (vectorized): u, v, z, T, S
 !*******************************************************************************
-subroutine push_matrix(sdim, nrens, nre, Amat)
+subroutine push_matrix(sdim, nrens, nre, Amat, ibrcl)
   use iso_fortran_env, only : dp => real64
   use basin
   use levels, only : nlv
@@ -210,7 +218,7 @@ subroutine push_matrix(sdim, nrens, nre, Amat)
   use mod_ts
   use mod_conz
   implicit none
-  integer,  intent(in)    :: sdim, nrens, nre
+  integer,  intent(in)    :: sdim, nrens, nre, ibrcl
   real(dp), intent(inout) :: Amat(sdim,nrens)
 
   integer :: dimz, dimuv, dimts
@@ -222,15 +230,16 @@ subroutine push_matrix(sdim, nrens, nre, Amat)
   Amat(1:dimuv, nre)                             = reshape(real(utlnv, dp), (/dimuv/))
   Amat(dimuv+1:2*dimuv, nre)                     = reshape(real(vtlnv, dp), (/dimuv/))
   Amat(2*dimuv+1:2*dimuv+dimz, nre)              = real(znv, dp)
-  Amat(2*dimuv+dimz+1:2*dimuv+dimz+dimts, nre)   = reshape(real(tempv, dp), (/dimts/))
-  Amat(2*dimuv+dimz+dimts+1:2*dimuv+dimz+2*dimts, nre) = reshape(real(saltv, dp), (/dimts/))
+  if (ibrcl /= 0) then
+     Amat(2*dimuv+dimz+1:2*dimuv+dimz+dimts, nre)   = reshape(real(tempv, dp), (/dimts/))
+     Amat(2*dimuv+dimz+dimts+1:2*dimuv+dimz+2*dimts, nre) = reshape(real(saltv, dp), (/dimts/))
+  end if
 end subroutine push_matrix
 
 !*******************************************************************************
 ! Pull one ensemble member back into SHYFEM fields from the ensemble matrix
-!   PATCH: added 'use iso_fortran_env, only: dp => real64' (dp visible here)
 !*******************************************************************************
-subroutine pull_matrix(sdim, nrens, nre, Amat)
+subroutine pull_matrix(sdim, nrens, nre, Amat, ibrcl)
   use iso_fortran_env, only : dp => real64
   use basin
   use levels, only : nlv
@@ -238,8 +247,9 @@ subroutine pull_matrix(sdim, nrens, nre, Amat)
   use mod_hydro_vel
   use mod_ts
   use mod_conz
+
   implicit none
-  integer,  intent(in) :: sdim, nrens, nre
+  integer,  intent(in) :: sdim, nrens, nre, ibrcl
   real(dp), intent(in) :: Amat(sdim,nrens)
 
   integer :: dimz, dimuv, dimts
@@ -251,38 +261,12 @@ subroutine pull_matrix(sdim, nrens, nre, Amat)
   utlnv = reshape(real(Amat(1:dimuv, nre)),                    (/nlv, nel/))
   vtlnv = reshape(real(Amat(dimuv+1:2*dimuv, nre)),            (/nlv, nel/))
   znv   = real(Amat(2*dimuv+1:2*dimuv+dimz, nre))
-  tempv = reshape(real(Amat(2*dimuv+dimz+1:2*dimuv+dimz+dimts, nre)), (/nlv, nkn/))
-  saltv = reshape(real(Amat(2*dimuv+dimz+dimts+1:2*dimuv+dimz+2*dimts, nre)), (/nlv, nkn/))
+  if (ibrcl /= 0) then
+     tempv = reshape(real(Amat(2*dimuv+dimz+1:2*dimuv+dimz+dimts, nre)), (/nlv, nkn/))
+     saltv = reshape(real(Amat(2*dimuv+dimz+dimts+1:2*dimuv+dimz+2*dimts, nre)), (/nlv, nkn/))
+  end if
+
 end subroutine pull_matrix
-
-!*******************************************************************************
-! Pull a full state vector back into SHYFEM fields (mean or std)
-!   PATCH: added 'use iso_fortran_env, only: dp => real64' (dp visible here)
-!*******************************************************************************
-subroutine pull_state(nvec, Avec)
-  use iso_fortran_env, only : dp => real64
-  use basin
-  use levels, only : nlv
-  use mod_hydro
-  use mod_hydro_vel
-  use mod_ts
-  use mod_conz
-  implicit none
-  integer,  intent(in) :: nvec
-  real(dp), intent(in) :: Avec(nvec)
-
-  integer :: dimz, dimuv, dimts
-
-  dimz  = nkn
-  dimuv = nlv*nel
-  dimts = nlv*nkn
-
-  utlnv = reshape(real(Avec(1:dimuv)),                         (/nlv, nel/))
-  vtlnv = reshape(real(Avec(dimuv+1:2*dimuv)),                 (/nlv, nel/))
-  znv   = real(Avec(2*dimuv+1:2*dimuv+dimz))
-  tempv = reshape(real(Avec(2*dimuv+dimz+1:2*dimuv+dimz+dimts)), (/nlv, nkn/))
-  saltv = reshape(real(Avec(2*dimuv+dimz+dimts+1:2*dimuv+dimz+2*dimts)), (/nlv, nkn/))
-end subroutine pull_state
 
 !*******************************************************************************
 ! Initialize SHYFEM environment from basin file and set levels
@@ -296,6 +280,7 @@ subroutine init_shyfem(basinf, nnlv)
   use mod_ts
   use mod_conz
   use mod_restart
+  use shympi
   implicit none
   character(len=80), intent(in) :: basinf
   integer,          intent(in) :: nnlv
@@ -316,6 +301,7 @@ subroutine init_shyfem(basinf, nnlv)
   call mod_ts_init(         nkn, nlv)
   call levels_init(         nkn, nel, nlv)
 
+  nkn_global = nkn; nel_global = nel; nlv_global = nlv
   ! Concentrations initialization (left commented as in original)
   ! call mod_conz_init(1, nkn, nlvdi)
 end subroutine init_shyfem

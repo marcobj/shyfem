@@ -76,6 +76,7 @@ program main
    ! Determine state dimension depending on restart layout.
    !  - ibarcl_rst = 0 → standard state size
    !  - ibarcl_rst ≠ 0 → larger state (baroclinic content included)
+   ! Note that the dimension of the model type is always with T/S
    !--------------------------------------------------------------------------
    if (ibarcl_rst == 0) then
       ndim = nnkn + 2*nnel*nnlv
