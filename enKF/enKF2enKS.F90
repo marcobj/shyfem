@@ -94,6 +94,8 @@ program enKF2enKS
   rrec = 0
 89 continue
 
+  nkn_global = nkn; nel_global = nel; nlv_global = nlv
+
   ! Read ensemble record across all members, same time index
   do nre = 1, nrens
      fid = 20 + nre

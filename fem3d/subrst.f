@@ -1444,7 +1444,7 @@
    99   continue
         write(6,*) 'error reading restart file...'
         write(6,*) 'nkn,nel,nlv:'
-        write(6,*) 'shyfem:  ',nkn,nel,nlv
+        write(6,*) 'shyfem:  ',nkn_global,nel_global,nlv_global
         write(6,*) 'rstfile: ',nknaux,nelaux,nlvaux
         stop 'error stop rst_read_record: incompatible parameters'
         end
