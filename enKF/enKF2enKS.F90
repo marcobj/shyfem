@@ -9,10 +9,15 @@
 !---------------------------------------------------------------------------------
 program enKF2enKS
   use iso_fortran_env, only: dp => real64
+  use mod_geom_dynamic
+  use mod_ts
+  use mod_hydro_vel
+  use mod_hydro
   use mod_restart
-  use levels,     only: nlvdi, nlv, hlv, ilhv, ilhkv
-  use shympi
+  use levels, only : nlvdi,nlv,hlv,ilhv,ilhkv
   use basin
+  use shympi
+
   implicit none
 
   !---------------------------- CLI arguments ----------------------------
@@ -125,9 +130,8 @@ program enKF2enKS
 
   ! Add RST parameters (first record only)
   if (rrec == 0) then
-     hlv  = hlvrst
-     ilhv = ilhrst
-     ilhkv = ilhkrst
+     hlv  = hlvrst; ilhv = ilhrst; ilhkv = ilhkrst
+     hlv_global = hlvrst
 
      ibarcl4     = ibarcl_rst
      iwvert4     = iwvert_rst
@@ -242,7 +246,7 @@ end subroutine push_matrix
 subroutine pull_matrix(sdim, nrens, nre, Amat, ibrcl)
   use iso_fortran_env, only : dp => real64
   use basin
-  use levels, only : nlv
+  use levels, only : nlvdi, nlv, hlv, ilhv, ilhkv
   use mod_hydro
   use mod_hydro_vel
   use mod_ts
