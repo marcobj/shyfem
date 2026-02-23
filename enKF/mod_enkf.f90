@@ -1,5 +1,5 @@
 !===============================================================
-!  mod_enkf.F90  (double precision, corrected, well commented)
+!  mod_enkf.f90 
 !---------------------------------------------------------------
 !  Purpose:
 !    Build the key matrices/vectors for EnKF analysis using the

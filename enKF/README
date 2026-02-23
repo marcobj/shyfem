@@ -57,7 +57,7 @@ To run the code, execute enKF.sh. The mandatory arguments are:
 
 Usage: enKF.sh [method] [localisation] [bas-file] [nlv] [n] [out]
 
-- method = 11|12|13|21|22|23       (see analysis.F90)
+- method = 11|12|13|21|22|23       (see analysis.f90)
 - localisation = 0 (disable), 1 (enable)
 - bas-file = name of the basin BAS file
 - nlv = number of vertical levels in the simulations
@@ -140,7 +140,7 @@ next lines : node_id   radius
 ----------
 mod_err.info (optional - experimental)
 ----------
-Enable by setting mode_an = 1 in mod_para.F90.
+Enable by setting mode_an = 1 in mod_para.f90.
 
 Defines red-noise model error parameters through an augmented state.
 
@@ -228,10 +228,10 @@ This file must contain one row:
 Where:
 - x, y, z = observation coordinates (same system as basin)
 - std     = observation error (standard deviation)
-- rho_loc = localisation radius (ignored if isloc = 0 in mod_para.F90)
+- rho_loc = localisation radius (ignored if isloc = 0 in mod_para.f90)
 
 
 Parameters of the assimilation
 ===================
 
-See the file mod_para.F90 for all assimilation parameters.
+See the file mod_para.f90 for all assimilation parameters.

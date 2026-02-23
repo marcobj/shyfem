@@ -93,14 +93,16 @@ enKF2enKS: enKF2enKS.o
 	$(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
 
 depend:
-	@$(MAKEDEPEND) -moddir=$(MODDIR) *.F90
+	@$(MAKEDEPEND) -moddir=$(MODDIR) *.f90
 
 
 #------------------- compilation rules
-.SUFFIXES: .f .F90
+.SUFFIXES: .f .F90 .f90
 .f.o:
 	$(F77) -c $(FFLAGS) $<
 .F90.o:
+	$(F77) -c $(FFLAGS) $< 
+.f90.o:
 	$(F77) -c $(FFLAGS) $< 
 
 

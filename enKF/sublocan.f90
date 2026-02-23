@@ -1,5 +1,5 @@
 !=======================================================================
-! sublocan.F90 -- Local analysis with EnKF on FEM grid (nodes & elems)
+! sublocan.f90 -- Local analysis with EnKF on FEM grid (nodes & elems)
 ! OpenMP version with Gaspari–Cohn localization (NO MPI)
 ! DOUBLE PRECISION (real64 via iso_fortran_env) throughout
 !

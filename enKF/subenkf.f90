@@ -1,5 +1,5 @@
 !======================================================================
-!  File: subenkf.F90
+!  File: subenkf.f90
 !  Purpose:
 !    Helper subroutines for EnKF workflows:
 !      - Restart read/write wrappers
