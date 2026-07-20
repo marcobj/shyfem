@@ -69,31 +69,12 @@ subroutine read_ensemble()
 
    call num2str(nanal, nal)
 
-   if (bnew_ens == 0 .or. nanal > 1) then
-      write(*,*) 'Loading existing ensemble...'
-      do ne = 1, nrens
-         call num2str(ne-1, nrel)
-         rstname = 'an'//nal//'_'//'en'//nrel//'b.rst'
-         call read_state(Abk(ne), rstname)
-      end do
-
-   else if (bnew_ens == 1 .and. nanal == 1) then
-      write(*,*) 'Creating a new ensemble...'
-      call num2str(0, nrel)
-      rstname = 'an'//nal//'_en'//nrel//'b.rst'
-      call read_state(Abk(1), rstname)
-      call make_init_ens(Abk(1))
-
-      do ne = 1, nrens
-         call num2str(ne-1, nrel)
-         rstname='an'//nal//'_'//'en'//nrel//'b.rst'
-         call write_state(Abk(ne), rstname)
-      end do
-
-   else
-      write(*,*) 'Invalid bnew_ens option'
-      error stop
-   end if
+   write(*,*) 'Loading existing ensemble...'
+   do ne = 1, nrens
+      call num2str(ne-1, nrel)
+      rstname = 'an'//nal//'_'//'en'//nrel//'b.rst'
+      call read_state(Abk(ne), rstname)
+   end do
 
 end subroutine read_ensemble
 !=======================================================================

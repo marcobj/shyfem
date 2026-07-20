@@ -18,11 +18,16 @@ endif
 override FFLAGS += $(R8FL)
 override LFLAGS += $(R8FL)
 
+# --- External Library Configurations ---
+NC_FLAGS := $(shell nf-config --fflags)
+NC_LIBS  := $(shell nf-config --flibs)
+
 #-------------------- run to make depends
 MAKEDEPEND = $(FEMBIN)/mkdp.pl
 
 #-------------------- shyfem objects
-SHYOBJ = $(FEM3D)/subrst.o $(FEM3D)/subbas.o $(FEM3D)/subdts.o $(FEM3D)/mod_bnd.o \
+SHYOBJ = $(FEM3D)/mod_shympi_dummy.o \
+	$(FEM3D)/subrst.o $(FEM3D)/subbas.o $(FEM3D)/subdts.o $(FEM3D)/mod_bnd.o \
 	$(FEM3D)/subreg.o $(FEM3D)/subfind.o $(FEM3D)/subpar3.o \
 	$(FEM3D)/subfil.o $(FEM3D)/mod_hydro.o $(FEM3D)/debug.o $(FEM3D)/subsss.o \
 	$(FEM3D)/subbit10.o $(FEM3D)/mod_geom_dynamic.o $(FEM3D)/mod_ts.o \
@@ -57,8 +62,15 @@ ENSMOD = $(MODDIR)/m_random.mod $(MODDIR)/mod_mod_err.mod $(MODDIR)/mod_enkf.mod
 	 $(MODDIR)/mod_obs_states.mod $(MODDIR)/mod_mod_states.mod $(MODDIR)/m_set_random_seed2.mod
 
 #-------------------- all the exec files
-EXES = main make_eof_ens_meteo enKF2enKS perturbeBC make_antime_list
-
+EXES = main \
+       make_antime_list \
+       perturbe_fem_wind_press \
+       perturbe_fem_heat \
+       perturbe_fem_scalar \
+       enKF2enKS \
+       perturbe_ts \
+       perturbe_state \
+       fem2nc
 
 #------------------- targets
 default: $(EXES)
@@ -75,22 +87,42 @@ main: main.o $(ENSOBJ)
 	$(LINKER) $(SHYOBJ) $@.o \
         $(ENSOBJ) $(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
 
-perturbeBC: perturbeBC.o m_sample2D.o m_pseudo2D.o m_newton2D.o \
+perturbe_fem_wind_press: perturbe_fem_wind_press.o m_sample2D.o \
+	m_pseudo2D.o m_newton2D.o m_set_random_seed2.o \
 	m_randrot.o m_fixsample2D.o m_random.o m_newtonfunc2D.o
-	$(LINKER) $@.o m_sample2D.o m_pseudo2D.o m_newton2D.o \
+	$(LINKER) $@.o m_sample2D.o m_pseudo2D.o m_newton2D.o m_set_random_seed2.o \
 	m_randrot.o m_fixsample2D.o m_random.o m_newtonfunc2D.o \
 	$(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
+
+perturbe_fem_heat: perturbe_fem_heat.o m_sample2D.o \
+	m_pseudo2D.o m_newton2D.o m_set_random_seed2.o \
+	m_randrot.o m_fixsample2D.o m_random.o m_newtonfunc2D.o
+	$(LINKER) $@.o m_sample2D.o m_pseudo2D.o m_newton2D.o m_set_random_seed2.o \
+	m_randrot.o m_fixsample2D.o m_random.o m_newtonfunc2D.o \
+	$(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
+
+perturbe_fem_scalar: perturbe_fem_scalar.o m_sample2D.o \
+	m_pseudo2D.o m_newton2D.o m_set_random_seed2.o \
+	m_randrot.o m_fixsample2D.o m_random.o m_newtonfunc2D.o
+	$(LINKER) $@.o m_sample2D.o m_pseudo2D.o m_newton2D.o m_set_random_seed2.o \
+	m_randrot.o m_fixsample2D.o m_random.o m_newtonfunc2D.o \
+	$(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
+
+perturbe_state: perturbe_state.o $(SAMPOBJ) $(SHYOBJ) subenkf.o m_random.o m_randrot.o
+	$(LINKER) $(LFLAGS) $@.o subenkf.o m_random.o m_randrot.o $(SAMPOBJ) $(SHYOBJ) $(DIRLIB)/libfem.a $(LIBS) $(NC_LIBS) -o $@
+
+perturbe_ts: perturbe_ts.o m_set_random_seed2.o m_random.o $(FEM3D)/subiso8601.o $(FEM3D)/subdts.o
+	$(LINKER) $(LFLAGS) $@.o m_set_random_seed2.o m_random.o $(FEM3D)/subiso8601.o $(FEM3D)/subdts.o $(DIRLIB)/libfem.a $(LIBS) -o $@
 
 make_antime_list: make_antime_list.o
 	$(LINKER) $(LFLAGS) $@.o $(DIRLIB)/libfem.a -o $@
 
-make_eof_ens_meteo: make_eof_ens_meteo.o m_random.o
-	$(LINKER) $@.o m_random.o \
-	$(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
-
 enKF2enKS: enKF2enKS.o 
 	$(LINKER) $(SHYOBJ) $@.o \
 	$(DIRLIB)/libfem.a $(LFLAGS) $(LIBS) -o $@
+
+fem2nc: fem2nc.o $(SHYOBJ)
+	$(LINKER) $(LFLAGS) $@.o $(SHYOBJ) $(DIRLIB)/libfem.a $(LIBS) $(NC_LIBS) -o $@
 
 depend:
 	@$(MAKEDEPEND) -moddir=$(MODDIR) *.f90
@@ -98,12 +130,16 @@ depend:
 
 #------------------- compilation rules
 .SUFFIXES: .f .F90 .f90
-.f.o:
-	$(F77) -c $(FFLAGS) $<
-.F90.o:
-	$(F77) -c $(FFLAGS) $< 
-.f90.o:
-	$(F77) -c $(FFLAGS) $< 
+
+%.o: %.f90
+	$(FC) $(FFLAGS) $(INCLUDE) $(NC_FLAGS) -c $< -o $@
+
+%.o: %.F90
+	$(FC) $(FFLAGS) $(INCLUDE) $(NC_FLAGS) -c $< -o $@
+
+%.o: %.f 
+	$(FC) $(FFLAGS) $(INCLUDE) -c $< -o $@
+
 
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.

@@ -54,9 +54,6 @@ Check_files() {
 Read_ens_list() {
     echo "[INFO] Initializing ensemble members..."
     rm -f an00001_en*b.rst
-    rst1=$(head -1 ens_list.txt | awk '{print $2}')
-    rst2=$(head -2 ens_list.txt | tail -1 | awk '{print $2}')
-    if [ "$rst1" = "$rst2" ]; then is_new_ens=1; else is_new_ens=0; fi
 
     nrow=0
     while read -r skelf rstf || [ -n "$skelf" ]; do
@@ -64,10 +61,8 @@ Read_ens_list() {
         Check_file "$skelf"
         Check_file "$rstf"
         skel_file[$nrow]="$skelf"
-        if [ "$is_new_ens" -eq "0" ] || [ "$nrow" -eq "0" ]; then
-            nel=$(printf "%05d" "$nrow")
-            ln -fs "$rstf" "an00001_en${nel}b.rst"
-        fi
+        nel=$(printf "%05d" "$nrow")
+        ln -fs "$rstf" "an00001_en${nel}b.rst"
         nrow=$((nrow + 1))
     done < ens_list.txt
     nrens=$nrow
@@ -112,7 +107,7 @@ Write_info_file() {
     local na=$1
     {
         echo "$nnlv"; echo "$nrens"; echo "$na"; echo "$bas_file"
-        echo "${timeo[$na]}"; echo "obs_list_tmp.txt"; echo "$is_new_ens"
+        echo "${timeo[$na]}"; echo "obs_list_tmp.txt"
         echo "$rmode"; echo "$islocal"
     } > analysis.info
 }
